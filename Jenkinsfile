@@ -18,6 +18,11 @@ pipeline {
             steps {
                 sh 'npm test'
             }
+            post {
+                always {
+                    junit '**/test-results/*.xml'
+                }
+            }
         }
 
         stage('Build') {
@@ -41,7 +46,7 @@ pipeline {
             echo 'Pipeline completed successfully!'
         }
         failure {
-            echo 'Pipeline failed!'
+            echo 'Pipeline failed!-new'
         }
     }
 }

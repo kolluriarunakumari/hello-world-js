@@ -1,30 +1,27 @@
 apiVersion: automation.cloudbees.io/v1alpha1
 kind: workflow
-name: Run App.js Workflow
+name: my-workflow
 
 on:
   push:
     branches:
-      - '**'
+      - feature/your-feature-name
 
 jobs:
-  run-app:
+  build-and-run:
+    timeout-minutes: 10
     steps:
       - name: Checkout code
         uses: cloudbees-io/checkout@v1
 
-      - name: Install dependencies
-        uses: docker://node:18-alpine
-        shell: sh
-        run: |
-          echo "Installing dependencies..."
-          npm install
-
-      - name: Run app.js
+      - name: Install dependencies and Run app.js
         uses: docker://node:18-alpine
         shell: sh
         env:
           NODE_ENV: production
         run: |
+          set -e
+          echo "Installing dependencies..."
+          npm install
           echo "Running app.js..."
           node app.js

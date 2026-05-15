@@ -1,6 +1,6 @@
 apiVersion: automation.cloudbees.io/v1alpha1
 kind: workflow
-name: My workflow
+name: Run App.js Workflow
 
 on:
   push:
@@ -8,10 +8,23 @@ on:
       - '**'
 
 jobs:
-  build:
+  run-app:
     steps:
-      - name: Say hello
-        uses: docker://golang:1.20.3-alpine3.17
+      - name: Checkout code
+        uses: cloudbees-io/checkout@v1
+
+      - name: Install dependencies
+        uses: docker://node:18-alpine
         shell: sh
         run: |
-          echo "hello world"
+          echo "Installing dependencies..."
+          npm install
+
+      - name: Run app.js
+        uses: docker://node:18-alpine
+        shell: sh
+        env:
+          NODE_ENV: production
+        run: |
+          echo "Running app.js..."
+          node app.js

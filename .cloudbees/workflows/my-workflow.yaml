@@ -22,7 +22,7 @@ jobs:
           set -e
           echo "Installing dependencies..."
           npm install
-          echo "Dependencies installed successfully."
+          echo "✅ Dependencies installed successfully."
           echo "Node version: $(node --version)"
           echo "NPM version: $(npm --version)"
 
@@ -34,37 +34,95 @@ jobs:
           PORT: 3000
         run: |
           set -e
-          echo "Starting app.js..."
-          npm install
+          echo "========================================="
+          echo " CI Pipeline Starting..."
+          echo "========================================="
 
-          # Start server and capture PID
+          # ── Step 1: Install dependencies ───────────
+          echo ""
+          echo "📦 Installing dependencies..."
+          npm install
+          echo "✅ Dependencies ready."
+
+          # ── Step 2: Start server in background ─────
+          echo ""
+          echo "🚀 Starting app.js..."
           node app.js &
           APP_PID=$!
+          echo "Server PID: $APP_PID"
 
-          # Wait for server to be ready (max 10 seconds)
-          echo "Waiting for server to start..."
-          sleep 5
+          # ── Step 3: Wait for server to be ready ────
+          echo ""
+          echo "⏳ Waiting for server to start..."
+          MAX_WAIT=30
+          ELAPSED=0
+          SERVER_READY=false
 
-          # Test the server is responding correctly
-          echo "Testing server response..."
-          RESPONSE=$(wget -qO- http://localhost:3000/ || echo "FAILED")
-          echo "Server response: $RESPONSE"
+          # Install curl if not available
+          apk add --no-cache curl 2>/dev/null || true
 
-          # Validate response contains expected message
-          if echo "$RESPONSE" | grep -q "Hello World"; then
-            echo "✅ Server responded correctly!"
-          else
-            echo "❌ Server response validation failed!"
+          while [ $ELAPSED -lt $MAX_WAIT ]; do
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:3000/health 2>/dev/null || echo "000")
+
+            if [ "$HTTP_STATUS" = "200" ]; then
+              SERVER_READY=true
+              break
+            fi
+
+            echo "  Waiting... ($ELAPSED s elapsed)"
+            sleep 1
+            ELAPSED=$((ELAPSED + 1))
+          done
+
+          if [ "$SERVER_READY" = "false" ]; then
+            echo "❌ Server did not start within ${MAX_WAIT} seconds!"
             kill $APP_PID 2>/dev/null || true
             exit 1
           fi
 
-          # Gracefully shut down the server
-          echo "Shutting down server gracefully..."
+          echo "✅ Server is running on http://localhost:3000"
+
+          # ── Step 4: Validate main route response ───
+          echo ""
+          echo "🔍 Testing server response..."
+          RESPONSE=$(curl -s http://localhost:3000/)
+          echo "Server response: $RESPONSE"
+
+          if echo "$RESPONSE" | grep -q "Hello World"; then
+            echo "✅ Server response validation passed!"
+          else
+            echo "❌ Server response validation failed!"
+            echo "   Expected: Hello World"
+            echo "   Got: $RESPONSE"
+            kill $APP_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          # ── Step 5: Health check ────────────────────
+          echo ""
+          echo "💓 Running health check..."
+          HEALTH=$(curl -s http://localhost:3000/health)
+          echo "Health response: $HEALTH"
+
+          if echo "$HEALTH" | grep -q "ok"; then
+            echo "✅ Health check passed!"
+          else
+            echo "❌ Health check failed!"
+            kill $APP_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          # ── Step 6: Graceful shutdown ───────────────
+          echo ""
+          echo "🛑 Shutting down server gracefully..."
           kill -SIGTERM $APP_PID 2>/dev/null || true
           sleep 2
 
           # Force kill if still running
           kill -9 $APP_PID 2>/dev/null || true
+          echo "✅ Server shut down cleanly."
 
-          echo "✅ app.js workflow completed successfully!"
+          echo ""
+          echo "========================================="
+          echo " ✅ CI Pipeline Passed Successfully!"
+          echo "========================================="

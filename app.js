@@ -6,7 +6,12 @@ app.use(express.json());
 
 // Main route
 app.get("/", (req, res) => {
+<<<<<<< HEAD
   res.json({ message: "Hello World! 6799" });
+=======
+  res.json({ message: "Hello World! 2" });
+  res.json({ message: "Hello World! 2" });
+>>>>>>> 02c3ddc9548371bc584a3a92bc77859b216e2110
 });
 
 // Health check route (useful for CI pipelines)

@@ -1,27 +1,70 @@
 apiVersion: automation.cloudbees.io/v1alpha1
 kind: workflow
-name: my-workflow
+name: Run App.js Workflow
 
 on:
   push:
     branches:
-      - feature/your-feature-name
+      - main
+      - feature/**
 
 jobs:
-  build-and-run:
-    timeout-minutes: 10
+  run-app:
+    timeout-minutes: 5
     steps:
       - name: Checkout code
         uses: cloudbees-io/checkout@v1
 
-      - name: Install dependencies and Run app.js
+      - name: Install dependencies and verify
         uses: docker://node:18-alpine
         shell: sh
-        env:
-          NODE_ENV: production
         run: |
           set -e
           echo "Installing dependencies..."
           npm install
-          echo "Running app.js..."
-          node app.js
+          echo "Dependencies installed successfully."
+          echo "Node version: $(node --version)"
+          echo "NPM version: $(npm --version)"
+
+      - name: Run app.js with graceful shutdown
+        uses: docker://node:18-alpine
+        shell: sh
+        env:
+          NODE_ENV: production
+          PORT: 3000
+        run: |
+          set -e
+          echo "Starting app.js..."
+          npm install
+
+          # Start server and capture PID
+          node app.js &
+          APP_PID=$!
+
+          # Wait for server to be ready (max 10 seconds)
+          echo "Waiting for server to start..."
+          sleep 5
+
+          # Test the server is responding correctly
+          echo "Testing server response..."
+          RESPONSE=$(wget -qO- http://localhost:3000/ || echo "FAILED")
+          echo "Server response: $RESPONSE"
+
+          # Validate response contains expected message
+          if echo "$RESPONSE" | grep -q "Hello World"; then
+            echo "✅ Server responded correctly!"
+          else
+            echo "❌ Server response validation failed!"
+            kill $APP_PID 2>/dev/null || true
+            exit 1
+          fi
+
+          # Gracefully shut down the server
+          echo "Shutting down server gracefully..."
+          kill -SIGTERM $APP_PID 2>/dev/null || true
+          sleep 2
+
+          # Force kill if still running
+          kill -9 $APP_PID 2>/dev/null || true
+
+          echo "✅ app.js workflow completed successfully!"
